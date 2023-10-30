@@ -24,176 +24,176 @@ const KWORDS = ['if', 'for', 'while', 'switch', 'catch', 'with']
 
 export default class ParserOV {
 
-    constructor(tagProps, src) {
+  constructor(tagProps, src) {
 
-        this.tagProps = this.parseTagProps(tagProps)
-        this.src = src
-        this.flags = ''
+    this.tagProps = this.parseTagProps(tagProps)
+    this.src = src
+    this.flags = ''
 
-        this.parseBody()
+    this.parseBody()
 
+  }
+
+  parseTagProps(src) {
+
+    let obj = {}
+    let pairs = src.split(',')
+    for (var p of pairs) {
+      let [key, val] = p.split('=')
+      obj[key.trim()] = val.trim()
     }
+    return obj
 
-    parseTagProps(src) {
+  }
 
-        let obj = {}
-        let pairs = src.split(',')
-        for (var p of pairs) {
-            let [key, val] = p.split('=')
-            obj[key.trim()] = val.trim()
-        }
-        return obj
+  parseBody() {
 
-    }
-
-    parseBody() {
-
-        let code = tools.decomment(this.src)
-        code = this.prepFuncions1(code)
-        code = this.prepFuncions2(code)
-        code = this.prepFuncions3(code)
+    let code = tools.decomment(this.src)
+    code = this.prepFuncions1(code)
+    code = this.prepFuncions2(code)
+    code = this.prepFuncions3(code)
         
-        let blocks = tools.extractStaticBlocks(code)
-        this.static = this.wrapStatic(blocks) 
+    let blocks = tools.extractStaticBlocks(code)
+    this.static = this.wrapStatic(blocks) 
         
-        code = this.renameStatic(code)
-        this.prefab = this.wrapTheCode(code, this.flags)
-    }
+    code = this.renameStatic(code)
+    this.prefab = this.wrapTheCode(code, this.flags)
+  }
 
-    // Find all function declarations & replace them with
-    // arrow functions (first category: f() {} )
-    prepFuncions1(code) {
-        let copy = ''
-        let i = 0
-        FREGX1.lastIndex = 0
-        do {
-            var m = FREGX1.exec(code)
-            if (m) {
-                let fkeyword = m[1].trim()
-                let fname = m[2]
-                let fargs = m[3]
+  // Find all function declarations & replace them with
+  // arrow functions (first category: f() {} )
+  prepFuncions1(code) {
+    let copy = ''
+    let i = 0
+    FREGX1.lastIndex = 0
+    do {
+      var m = FREGX1.exec(code)
+      if (m) {
+        let fkeyword = m[1].trim()
+        let fname = m[2]
+        let fargs = m[3]
 
-                // Skipping the function code block
-                let open = FREGX1.lastIndex - 1
-                let close = tools.findClosingBracket(code, open)
+        // Skipping the function code block
+        let open = FREGX1.lastIndex - 1
+        let close = tools.findClosingBracket(code, open)
 
-                if (!KWORDS.includes(fname)) {
-                    let block = code.slice(open, close + 1)
-                    copy += code.slice(i, m.index)
-                    copy += `var ${fname} = (${fargs}) => ${block}`
-                    this.parseFlags(fname, fargs, block)
-                } else {
-                    copy += code.slice(i, close+1)
-                }
-
-                FREGX1.lastIndex = close
-                i = close + 1
-
-            }
-        } while (m)
-        return copy + code.slice(i) // The rest
-    }
-
-    // Find all function declarations & replace them with
-    // arrow functions (third category: f() => {})
-    prepFuncions2(code) {
-        let copy = ''
-        let i = 0
-        FREGX2.lastIndex = 0
-        do {
-            var m = FREGX2.exec(code)
-            if (m) {
-                let fkeyword = m[1].trim()
-                let fname = m[2]
-                let fargs = m[3]
-
-                // Skipping the function code block
-                let open = FREGX2.lastIndex - 1
-                let close = tools.findClosingBracket(code, open)
-
-                if (!KWORDS.includes(fname)) {
-                    let block = code.slice(open, close + 1)
-                    copy += code.slice(i, m.index)
-                    copy += `var ${fname} = (${fargs}) => (${block})`
-                    this.parseFlags(fname, fargs, block)
-                } else {
-                    copy += code.slice(i, close+1)
-                }
-
-                FREGX2.lastIndex = close
-                i = close + 1
-
-            }
-        } while (m)
-        return copy + code.slice(i) // The rest
-    }
-
-    // Find all function declarations & replace them with
-    // arrow functions (third category: f() => Expression)
-    prepFuncions3(code) {
-        let copy = ''
-        let i = 0
-        FREGX3.lastIndex = 0
-        do {
-            var m = FREGX3.exec(code)
-            if (m) {
-                let fkeyword = m[1].trim()
-                let fname = m[2]
-                let fargs = m[3]
-
-                let arrow = FREGX3.lastIndex
-
-                copy += code.slice(i, m.index)
-                copy += `var ${fname} = (${fargs}) => `
-                let block = code.slice(arrow).split('\n')[0].trim()
-                this.parseFlags(fname, fargs, block)
-
-                i = arrow + 1
-
-            }
-        } while (m)
-        return copy + code.slice(i) // The rest
-    }
-
-    // Add some flag for the future use (e.g. in layout)
-    parseFlags(name, fargs, block) {
-        if (name === 'yRange') {
-            // Precalc if at least 'h' needed
-            let x = fargs.trim().split(',').length > 1 // (data, h, ...)
-            this.flags += `yRangePreCalc: ${x},\n`
-        } else if (name === 'legend') {
-            if (block === 'null' || block === 'undefined') {
-                this.flags += `noLegend: true,\n`
-            }
+        if (!KWORDS.includes(fname)) {
+          let block = code.slice(open, close + 1)
+          copy += code.slice(i, m.index)
+          copy += `var ${fname} = (${fargs}) => ${block}`
+          this.parseFlags(fname, fargs, block)
+        } else {
+          copy += code.slice(i, close+1)
         }
-    }
 
-    wrapStatic(code) {
-        let renamed = code.replace(SREGX, '$static.$1 =');
-        const wrappedScript = `
+        FREGX1.lastIndex = close
+        i = close + 1
+
+      }
+    } while (m)
+    return copy + code.slice(i) // The rest
+  }
+
+  // Find all function declarations & replace them with
+  // arrow functions (third category: f() => {})
+  prepFuncions2(code) {
+    let copy = ''
+    let i = 0
+    FREGX2.lastIndex = 0
+    do {
+      var m = FREGX2.exec(code)
+      if (m) {
+        let fkeyword = m[1].trim()
+        let fname = m[2]
+        let fargs = m[3]
+
+        // Skipping the function code block
+        let open = FREGX2.lastIndex - 1
+        let close = tools.findClosingBracket(code, open)
+
+        if (!KWORDS.includes(fname)) {
+          let block = code.slice(open, close + 1)
+          copy += code.slice(i, m.index)
+          copy += `var ${fname} = (${fargs}) => (${block})`
+          this.parseFlags(fname, fargs, block)
+        } else {
+          copy += code.slice(i, close+1)
+        }
+
+        FREGX2.lastIndex = close
+        i = close + 1
+
+      }
+    } while (m)
+    return copy + code.slice(i) // The rest
+  }
+
+  // Find all function declarations & replace them with
+  // arrow functions (third category: f() => Expression)
+  prepFuncions3(code) {
+    let copy = ''
+    let i = 0
+    FREGX3.lastIndex = 0
+    do {
+      var m = FREGX3.exec(code)
+      if (m) {
+        let fkeyword = m[1].trim()
+        let fname = m[2]
+        let fargs = m[3]
+
+        let arrow = FREGX3.lastIndex
+
+        copy += code.slice(i, m.index)
+        copy += `var ${fname} = (${fargs}) => `
+        let block = code.slice(arrow).split('\n')[0].trim()
+        this.parseFlags(fname, fargs, block)
+
+        i = arrow + 1
+
+      }
+    } while (m)
+    return copy + code.slice(i) // The rest
+  }
+
+  // Add some flag for the future use (e.g. in layout)
+  parseFlags(name, fargs, block) {
+    if (name === 'yRange') {
+      // Precalc if at least 'h' needed
+      let x = fargs.trim().split(',').length > 1 // (data, h, ...)
+      this.flags += `yRangePreCalc: ${x},\n`
+    } else if (name === 'legend') {
+      if (block === 'null' || block === 'undefined') {
+        this.flags += 'noLegend: true,\n'
+      }
+    }
+  }
+
+  wrapStatic(code) {
+    let renamed = code.replace(SREGX, '$static.$1 =')
+    const wrappedScript = `
             var $static = {}
             ${renamed}
             return $static
-        `;
-        try {
-            // Using the Function constructor.
-            const dynamicFunction = new Function(wrappedScript);
-            const result = dynamicFunction();
-            return result
-        } catch (error) {
-            console.error("Error parsing static functions", error);
-        }
-        return {}
+        `
+    try {
+      // Using the Function constructor.
+      const dynamicFunction = new Function(wrappedScript)
+      const result = dynamicFunction()
+      return result
+    } catch (error) {
+      console.error('Error parsing static functions', error)
     }
+    return {}
+  }
 
-    // Rename static functions 
-    renameStatic(code) {
-        return code.replace(SREGX, '$static.$1 =')
-    }
+  // Rename static functions 
+  renameStatic(code) {
+    return code.replace(SREGX, '$static.$1 =')
+  }
 
-    // Create a function that returns a new overlay object
-    wrapTheCode(code, flags) {
-        return new Function('env', `
+  // Create a function that returns a new overlay object
+  wrapTheCode(code, flags) {
+    return new Function('env', `
 
             // Setup the environment
             let { $core, $props, $events } = env
@@ -247,6 +247,6 @@ export default class ParserOV {
                 // Generated flags
                 ${flags}
             }
-        `);
-    }
+        `)
+  }
 }
